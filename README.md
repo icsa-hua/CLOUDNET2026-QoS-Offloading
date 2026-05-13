@@ -181,14 +181,4 @@ MIT
 
 ---
 
-## Citation
 
-```bibtex
-@misc{hua2026cloudnet,
-  title  = {{HUA} QoS-Aware AI Offloading Framework: A Physics-Based Synthetic Dataset and ML Simulator
-             for QoS-Aware AI Task Offloading in Connected Vehicles},
-  author = {Gyftodimos, Konstantinos and [co-authors]},
-  year   = {2026},
-  note   = {IEEE CloudNet 2026 Demo \& Artifact Track}
-}
-```
