@@ -1,0 +1,315 @@
+% IEEE CloudNet 2026 — Demo & Artifact Track
+% 2 pages, 10 pt, double-column
+% Compile: pdflatex main && pdflatex main
+%
+\documentclass[10pt,conference]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{makecell}
+\usepackage[table]{xcolor}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\title{QoS-Aware AI Inference Offloading for Vehicular Edge Computing:\\
+       A Physics-Based Dataset and Simulation Framework}
+
+\author{%
+  \IEEEauthorblockN{%
+    Konstantinos Gyftodimos,\quad
+    Eirini Liotou,\quad
+    Kyriakos Chiotis,\quad
+    George Dimitrakopoulos%
+  }%
+  \IEEEauthorblockA{%
+    Dept.\ of Informatics and Telematics,
+    Harokopio University of Athens (HUA), Athens, Greece\\
+    \{kgyftodimos,\;eliotou,\;kchiotis,\;gdimitra\}@\textit{hua.gr}\quad
+    \textit{Presenter: K.\,Gyftodimos\,---\,onsite}%
+  }%
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\maketitle
+
+% ── Abstract ─────────────────────────────────────────────────────────────────
+\begin{abstract}
+We present a physics-based open-source simulation framework for QoS-aware AI
+inference offloading in vehicular edge computing, comprising a 50,000-sample
+synthetic dataset across five road scenarios, a multi-output machine-learning
+predictor, and a real-time closed-loop demonstration.
+\end{abstract}
+
+% ── I. Overview ──────────────────────────────────────────────────────────────
+\section{Overview}
+
+Autonomous vehicles generate continuous high-rate video streams that must be
+processed by YOLOv8~\cite{yolov8} object detection under a strict 100\,ms
+end-to-end latency constraint.  The simulation framework models a four-tier
+execution hierarchy: (A)~a dedicated lightweight on-board neural processing
+unit (NPU), (B)~the vehicle's primary high-throughput GPU, (C)~a nearby
+Multi-Access Edge Computing (MEC)~\cite{etsi_mec} server, and (D)~a remote
+cloud data centre.  Each tier runs a different YOLOv8 variant and offers a
+distinct latency--accuracy trade-off (Table~\ref{tab:modes}).  Selecting the
+optimal tier in real time requires jointly predicting network conditions and
+enforcing Quality of Service (QoS) constraints simultaneously.
+
+Most vehicular offloading studies rely on proprietary radio traces or abstract
+the channel to the point that MEC latency variability is not faithfully
+reproduced.  This artifact provides an open, end-to-end reproducible
+baseline---from 3GPP-calibrated channel simulation to closed-loop
+optimisation---that is fully self-contained, runs offline, and is portable to
+any compute-intensive edge inference workload.  Use cases range from benchmarking novel offloading policies to evaluating
+new edge AI models and prototyping QoS-aware placement for autonomous
+driving or smart-infrastructure monitoring.
+
+\textbf{Delivery format:} physical, onsite demonstration at IEEE
+CloudNet~2026.  The complete system runs as a single terminal command on a
+standard laptop with no external hardware or network connection required.
+
+% ── II. Innovation \& Contribution ───────────────────────────────────────────
+\section{Innovation \& Contribution}
+
+\begin{enumerate}
+  \item \textbf{Physics-based synthetic dataset (50\,k samples).}
+        Generated via a 3GPP TR\,38.901-calibrated log-distance path-loss
+        model~\cite{3gpp38901} with log-normal shadowing and non-line-of-sight
+        (NLOS) transitions, combined with Shannon--Hartley
+        throughput~\cite{shannon1948}.  Five road scenarios span 300\,m
+        to 10\,km MEC inter-site distances (urban dense through rural),
+        with scenario-specific speed, bandwidth, and frequency profiles.
+        Fixed-seed (42) reproducible; MIT license; schema in
+        Table~\ref{tab:schema}.
+
+  \item \textbf{Multi-output machine-learning (ML) predictor.}
+        A \texttt{RandomForestRegressor} (200 trees, 80/20 train-test split)
+        predicts MEC and cloud round-trip time (RTT) and server capacity
+        utilisation; a \texttt{GradientBoostingClassifier} predicts MEC
+        availability (binary).  All scikit-learn~\cite{sklearn} pipelines are
+        serialised to disk after training and loaded on subsequent runs,
+        reducing cold-start time to $\approx$1\,s.  Per-frame predictions are
+        smoothed with an exponential moving average ($\alpha$\,=\,0.3) to
+        suppress oscillation under transient channel variations.
+
+  \item \textbf{Edge-first QoS optimizer.}
+        The decision engine enforces three hard QoS budgets: total latency
+        $\leq$100\,ms, accuracy loss $\leq$15\%, and server capacity
+        $<$95\%.  Among feasible modes it applies an edge-first preference
+        rule: Mode~C (MEC) is chosen over Mode~D (Cloud) when the
+        incremental mean Average Precision (mAP) gain of the cloud model is
+        below 5\,pts, thereby conserving Wide Area Network (WAN) bandwidth.
+        If no mode satisfies all constraints---e.g.\ during a connectivity
+        outage---the optimizer falls back to Mode~B (on-board GPU) with an
+        explicit reason flag (\texttt{fallback\_no\_feasible\_mode}).
+
+  \item \textbf{Live four-tier failover demo.}
+        The complete pipeline executes in a single command and demonstrates
+        all four execution tiers within one 100-frame run.  A simulated
+        connectivity outage (frames 40--54) forces MEC unreachable and
+        inflates cloud RTT to 200\,ms, driving the system through a full
+        C\,$\to$\,B\,$\to$\,C failover and making all QoS constraint paths
+        observable in real time.
+\end{enumerate}
+
+% Tables II and I placed after Innovation so LaTeX floats both to page 2.
+\begin{table}[t]
+\centering
+\caption{YOLOv8 Execution Mode Specifications}
+\label{tab:modes}
+\scriptsize\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}clrrr@{}}
+\toprule
+\textbf{Mode} & \textbf{Hardware\,/\,Model} &
+  \textbf{Tot.\,(ms)} & \textbf{mAP} & \textbf{AccLoss} \\
+\midrule
+A & Car NPU\,/\,YOLOv8n  &   8       & 37.3 & 20.8\%$^*$ \\
+B & Car GPU\,/\,YOLOv8n  &   5       & 37.3 & 20.8\%$^*$ \\
+C & MEC\,/\,YOLOv8m      & $\sim$24  & 50.2 &  4.9\%     \\
+D & Cloud\,/\,YOLOv8l    & $\sim$84  & 52.9 &  0.0\%     \\
+\bottomrule
+\multicolumn{5}{@{}l}{Budget: latency $\leq$100\,ms, acc.\ loss $\leq$15\%, cap.\ $<$95\%.}\\
+\multicolumn{5}{@{}l}{$^*$Exceed budget; activate only as emergency fallback.}
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Dataset Feature Schema (key columns; full schema in repository)}
+\label{tab:schema}
+\small\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Feature} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{scenario}              & cat.  & Road environment (5 types) \\
+\texttt{car\_speed\_kmh}       & float & Vehicle speed (km/h) \\
+\texttt{mec\_distance\_m}      & float & Distance to MEC tower (m) \\
+\texttt{mec\_rssi\_dbm}        & float & Received signal strength (dBm) \\
+\texttt{num\_connected\_ues}   & int   & User equipment sharing cell \\
+\texttt{cloud\_congestion}     & float & WAN congestion index [0,\,1] \\
+\texttt{payload\_kb}           & float & Compressed frame size (kB) \\
+\midrule
+\texttt{mec\_available}        & bin.  & \textbf{Target:} MEC reachability \\
+\texttt{mec\_network\_ms}      & float & \textbf{Target:} MEC RTT (ms) \\
+\texttt{mec\_capacity\_pct}    & float & \textbf{Target:} MEC load (\%) \\
+\texttt{cloud\_network\_ms}    & float & \textbf{Target:} Cloud RTT (ms) \\
+\texttt{cloud\_capacity\_pct}  & float & \textbf{Target:} Cloud load (\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ── III. Relevance to CloudNet ────────────────────────────────────────────────
+\section{Relevance to CloudNet}
+
+The artifact targets CloudNet researchers working on vehicular edge
+computing~\cite{shi2016edge}, task offloading~\cite{chen2019offloading}, and
+5G edge AI~\cite{liu2020edge}.  Key takeaways:
+\begin{itemize}
+  \item \textbf{Reproducible baseline.}  A 3GPP-calibrated MEC offloading
+        dataset across five deployment archetypes, from dense urban (300\,m
+        MEC spacing) to rural (10\,km), freely available for comparison and
+        extension by the research community.
+  \item \textbf{Offloading as a necessity.}  Empirical evidence that on-board
+        YOLOv8n (Modes~A/B) incurs a 20.8\% accuracy loss relative to cloud
+        YOLOv8l, exceeding the 15\% QoS budget and making MEC/cloud
+        offloading mandatory whenever connectivity permits.
+  \item \textbf{End-to-end blueprint.}  A complete, runnable coupling of ML
+        network-state prediction with a policy-based QoS optimizer, portable
+        to other inference workloads (e.g.\ LiDAR processing, V2X perception)
+        and extendable to new tier definitions or QoS policies.
+\end{itemize}
+
+% ── IV. Demonstration Plan \& Requirements ────────────────────────────────────
+\section{Demonstration Plan \& Requirements}
+
+\textbf{Setup.}
+Install dependencies (\texttt{pip install -r requirements.txt}) and launch
+\texttt{python demo.py}.  On first run the system auto-generates the 50\,k
+synthetic dataset and trains all ML models ($\approx$50\,s total);
+subsequent runs load the serialised models and start in $\approx$2\,s.
+
+\textbf{What the audience observes.}
+The terminal table (Table~\ref{tab:live}) refreshes at 5\,Hz for 100 frames,
+showing all four tiers simultaneously with live per-mode latency, accuracy
+loss, capacity, and decision reason.  Under normal suburban conditions Mode~C
+(MEC / YOLOv8m, $\approx$57\,ms total) is selected over Mode~D (Cloud /
+YOLOv8l, $\approx$72\,ms) by the edge-first rule.  Modes~A and~B are visible
+every frame, marked infeasible due to the 20.8\% accuracy-loss violation.
+Starting at frame~40 an injected outage forces MEC unavailable and cloud RTT
+to 200\,ms; the optimizer switches to Mode~B (5\,ms on-board GPU) with reason
+\texttt{fallback\_no\_feasible\_mode}, demonstrating the full failover path
+before recovering to Mode~C once the outage clears.
+
+\textbf{AV / Power:} standard laptop (CPU-only, no GPU required); terminal
+with ANSI colour support.  No special power supply, networking, or AV
+equipment needed.  Total runtime: $\approx$50\,s first run, $\approx$20\,s
+subsequently.
+
+% ── V. Artifact Details ───────────────────────────────────────────────────────
+\section{Artifact Details}
+
+All components are in a public GitHub repository
+(\url{https://github.com/[org]/cloudnet2026-offloading}, release
+\texttt{v1.0.0}; Ubuntu~22.04 / macOS~14 / Python~3.11).
+
+\textbf{Dataset:} 50\,k-row CSV, 13 features\,+\,5 targets
+(Table~\ref{tab:schema}); synthetic, MIT license; Zenodo DOI on
+acceptance; regenerate via
+\texttt{python -m src.dataset.generate -{}-seed 42}.
+
+\textbf{Framework:} \texttt{src/dataset/} (channel sim),
+\texttt{src/predictor/} (ML pipelines), \texttt{src/offloading/}
+(QoS optimizer).  Dataset and model bundled; auto-recreated if absent.
+
+\textbf{Demo:} \texttt{python demo.py} shows live per-mode latency,
+accuracy loss, capacity, and decision reason; configurable via
+\texttt{-{}-scenario}, \texttt{-{}-hz}, \texttt{-{}-outage-at}.
+
+% ── VI. Ethics, Privacy \& Safety ────────────────────────────────────────────
+\section{Ethics, Privacy \& Safety}
+
+The dataset is entirely synthetic---generated from a calibrated radio-physics
+model with no real-world measurements, user data, or personally identifiable
+information.  No human subjects or consent procedures are required.  The
+framework poses no safety risk.
+
+% ── Acknowledgment ───────────────────────────────────────────────────────────
+\section*{Acknowledgment}
+
+This work has been funded by the Shift2SDV project (Grant Agreement
+No.~101194245), supported by the Chips Joint Undertaking and its members,
+including top-up funding by the national authorities of Austria, Denmark,
+Germany, Greece, Finland, Italy, Netherlands, Poland, Portugal, Spain, and
+Turkey.
+
+% Table III: single-column, placed before bibliography so LaTeX
+% numbers it correctly and floats it to the bottom of a page-2 column.
+\begin{table}[b]
+\centering
+\caption{%
+  Live optimizer snapshot (suburban, frame 100/100, MEC dist.\ 611\,m,
+  signal $-$55.5\,dBm, 4 mode switches).
+  Tot.\,(ms)\,=\,inference\,$+$\,network RTT.%
+}
+\label{tab:live}
+\renewcommand{\arraystretch}{0.95}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular}{@{} c l r r r l @{}}
+\Xhline{2\arrayrulewidth}
+\textbf{M.} & \textbf{Model} &
+  \textbf{Tot.\,(ms)} & \textbf{mAP} & \textbf{AccLoss} &
+  \textbf{Status} \\
+\hline
+A & \texttt{yolov8n} &  8.0 & 37.3 & 20.8\% & $\times$\ loss\,$>$\,15\% \\
+B & \texttt{yolov8n} &  5.0 & 37.3 & 20.8\% & $\times$\ loss\,$>$\,15\% \\
+\rowcolor{gray!15}
+C & \texttt{yolov8m} & 56.9 & 50.2 &  4.9\% &
+  $\blacktriangleleft$\ \textbf{SELECTED} \\
+D & \texttt{yolov8l} & 71.6 & 52.9 &  0.0\% & feasible, not preferred \\
+\Xhline{2\arrayrulewidth}
+\end{tabular}
+\end{table}
+
+\begin{thebibliography}{8}
+
+\bibitem{yolov8}
+G.~Jocher, A.~Chaurasia, and J.~Qiu,
+``Ultralytics YOLOv8,'' GitHub, 2023.
+[Online]. Available: \url{https://github.com/ultralytics/ultralytics}
+
+\bibitem{etsi_mec}
+ETSI,
+``GS MEC~003: MEC Framework and Reference Architecture, v3.1.1,'' 2022.
+
+\bibitem{3gpp38901}
+3GPP,
+``TR~38.901: Study on channel model for frequencies from 0.5 to
+100~GHz, v16.1.0,'' 3rd Generation Partnership Project, 2019.
+
+\bibitem{shannon1948}
+C.~E.~Shannon,
+``A mathematical theory of communication,''
+\textit{Bell Syst. Tech. J.}, vol.~27, pp.~379--423, 1948.
+
+\bibitem{shi2016edge}
+W.~Shi \textit{et~al.},
+``Edge computing: Vision and challenges,''
+\textit{IEEE Internet Things J.}, vol.~3, no.~5, pp.~637--646, 2016.
+
+\bibitem{chen2019offloading}
+X.~Chen \textit{et~al.},
+``Optimized computation offloading via deep reinforcement learning,''
+\textit{IEEE Internet Things J.}, vol.~6, no.~3, pp.~4005--4018, 2019.
+
+\bibitem{liu2020edge}
+Y.~Liu \textit{et~al.},
+``Toward edge intelligence: MEC for 5G and IoT,''
+\textit{IEEE Internet Things J.}, vol.~7, no.~8, pp.~6722--6747, 2020.
+
+\end{thebibliography}
+
+\end{document}
