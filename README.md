@@ -1,7 +1,7 @@
-# HUA — QoS-Aware AI Offloading for Connected Vehicles
+# QoS-Aware AI Inference Offloading for Vehicular Edge Computing
 
 **IEEE CloudNet 2026 · Demo & Artifact Submission**  
-HUA · Technical University of Denmark (DTU)
+Dept. of Informatics and Telematics, Harokopio University of Athens (HUA)
 
 ---
 
@@ -57,7 +57,8 @@ The framework has three components:
 ## Quick Start
 
 ```bash
-git clone <repo-url> && cd cloudnet
+git clone https://github.com/icsa-hua/CLOUDNET2026-QoS-Offloading.git
+cd CLOUDNET2026-QoS-Offloading
 pip install -r requirements.txt
 
 # 1 — generate dataset
@@ -80,14 +81,15 @@ python demo.py --no-train --scenario highway --hz 10 --frames 200
 
 ## Execution Modes
 
-| Mode | Hardware    | Model    | Inf. (ms) | Net. (ms) | Total (ms) | mAP@0.5:0.95 |
-|------|-------------|----------|-----------|-----------|------------|--------------|
-| A    | Car GPU 1   | YOLOv8n  | 8         | 0         | 8          | 37.3         |
-| B    | Car GPU 2   | YOLOv8n  | 5         | 0         | 5          | 37.3         |
-| C    | MEC server  | YOLOv8m  | 6         | ~18       | ~24        | 50.2         |
-| D    | Cloud       | YOLOv8l  | 4         | ~60       | ~84        | 52.9         |
+| Mode | Hardware    | Model    | Inf. (ms) | Net. (ms) | Total (ms) | mAP@0.5:0.95 | Acc. Loss |
+|------|-------------|----------|-----------|-----------|------------|--------------|-----------|
+| A    | Car NPU     | YOLOv8n  | 8         | 0         | 8          | 37.3         | 20.8%\*   |
+| B    | Car GPU     | YOLOv8n  | 5         | 0         | 5          | 37.3         | 20.8%\*   |
+| C    | MEC server  | YOLOv8m  | 6         | ~18       | ~24        | 50.2         |  4.9%     |
+| D    | Cloud       | YOLOv8l  | 4         | ~60       | ~84        | 52.9         |  0.0%     |
 
-**QoS budgets:** latency ≤ 100 ms · accuracy loss ≤ 15% · capacity < 95%
+**QoS budgets:** latency ≤ 100 ms · accuracy loss ≤ 15% · capacity < 95%  
+\* Modes A and B exceed the accuracy-loss budget and are only activated as emergency fallback.
 
 ---
 
@@ -161,16 +163,16 @@ Annotated video generation. Key function: `run_detection(source, modes, ...)`.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Frame    42  │  dist:    823 m  │  RSSI:  -68.4 dBm  │  MEC reachable: YES
+  Frame   100  │  dist:    611 m  │  RSSI:  -55.5 dBm  │  MEC reachable: YES
 ────────────────────────────────────────────────────────────────────────
   Mode  Model      HW          Inf     Net    Total    mAP  AccLoss   Cap%   Status
   ─────────────────────────────────────────────────────────────────────────
-  A     yolov8n    Car GPU 1    8.0     0.0     8.0   37.3    14.7%     0%   feasible
-  B     yolov8n    Car GPU 2    5.0     0.0     5.0   37.3    14.7%     0%   feasible
-  C     yolov8m    MEC          6.0    22.1    28.1   50.2     5.1%    43%   feasible
-  D     yolov8l    Cloud        4.0    63.4    67.4   52.9     0.0%    28%   ◄ SELECTED
+  A     yolov8n    Car NPU      8.0     0.0     8.0   37.3    20.8%     0%   ✗ loss > 15%
+  B     yolov8n    Car GPU      5.0     0.0     5.0   37.3    20.8%     0%   ✗ loss > 15%
+  C     yolov8m    MEC          6.0    50.9    56.9   50.2     4.9%    43%   ◄ SELECTED
+  D     yolov8l    Cloud        4.0    67.6    71.6   52.9     0.0%    28%   feasible, not preferred
 
-  ► Decision : Mode D  [yolov8l @ Cloud]  max_accuracy_feasible
+  ► Decision : Mode C  [yolov8m @ MEC]  edge_first_preferred_over_cloud
 ```
 
 ---
@@ -184,11 +186,13 @@ MIT
 ## Citation
 
 ```bibtex
-@misc{hua2026cloudnet,
-  title  = {{HUA} QoS-Aware AI Offloading Framework: A Physics-Based Synthetic Dataset and ML Simulator
-             for QoS-Aware AI Task Offloading in Connected Vehicles},
-  author = {Gyftodimos, Konstantinos and [co-authors]},
-  year   = {2026},
-  note   = {IEEE CloudNet 2026 Demo \& Artifact Track}
+@inproceedings{gyftodimos2026cloudnet,
+  title     = {{QoS}-Aware {AI} Inference Offloading for Vehicular Edge Computing:
+               A Physics-Based Dataset and Simulation Framework},
+  author    = {Gyftodimos, Konstantinos and Liotou, Eirini and
+               Chiotis, Kyriakos and Dimitrakopoulos, George},
+  booktitle = {Proc. IEEE Int. Conf. on Cloud Networking (CloudNet)},
+  year      = {2026},
+  note      = {Demo \& Artifact Track}
 }
 ```
