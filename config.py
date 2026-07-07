@@ -12,9 +12,10 @@ import torch
 
 ROOT = Path(__file__).resolve().parent
 
-DATA_PATH  = ROOT / "data"  / "network_dataset.csv"
-MODEL_PATH = ROOT / "models" / "predictor.pkl"
-OUTPUT_DIR = ROOT / "output"
+DATA_PATH     = ROOT / "data"  / "network_dataset.csv"
+MODEL_PATH    = ROOT / "models" / "predictor.pkl"
+QUANTILE_PATH = ROOT / "models" / "predictor_q90.pkl"
+OUTPUT_DIR    = ROOT / "output"
 
 # ── QoS budgets ───────────────────────────────────────────────────────────────
 

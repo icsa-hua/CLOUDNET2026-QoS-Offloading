@@ -57,14 +57,19 @@ class InferenceClient:
 
     def __init__(
         self,
-        scenario:   str  = "urban_dense",
-        hz:         int  = 10,
-        model_path       = MODEL_PATH,
+        scenario:      str  = "urban_dense",
+        hz:            int  = 10,
+        model_path          = MODEL_PATH,
+        quantile_path       = None,
     ) -> None:
         if scenario not in SCENARIOS:
             raise ValueError(f"Unknown scenario '{scenario}'. Choose from: {list(SCENARIOS)}")
 
         self._bundle    = load_bundle(model_path)
+        self._qbundle   = None
+        if quantile_path is not None:
+            from src.predictor.quantile import load_quantile_bundle
+            self._qbundle = load_quantile_bundle(quantile_path)
         self._scenario  = scenario
         self._profile   = SCENARIOS[scenario]
         self._hz        = hz
@@ -116,6 +121,9 @@ class InferenceClient:
         }
 
         result              = predict(self._bundle, state)
+        if self._qbundle is not None:
+            from src.predictor.quantile import predict_quantile
+            result.update(predict_quantile(self._qbundle, state))
         result["dist_m"]    = round(self._dist, 1)
         result["rssi_dbm"]  = round(rssi, 1)
         result["scenario"]  = self._scenario

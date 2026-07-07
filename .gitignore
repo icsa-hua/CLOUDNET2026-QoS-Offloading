@@ -1,1 +1,17 @@
-*.tex
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+
+# Generated artifacts
+models/
+output/
+*.pkl
+__pycache__/
+*.pyc
+
+# YOLO weights
+*.pt

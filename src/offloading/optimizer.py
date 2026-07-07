@@ -122,6 +122,68 @@ def select_mode(table: dict[str, dict]) -> tuple[str, str]:
     return best_mode, reason
 
 
+class DwellTimeStabilizer:
+    """
+    Minimum-dwell hysteresis filter for the per-frame mode decision.
+
+    Suppresses ping-pong switching under noisy network predictions: a
+    proposed mode change is committed only after it persists for ``k``
+    consecutive frames.  Wrap :func:`select_mode` output::
+
+        stab = DwellTimeStabilizer(k=5)
+        mode, reason = select_mode(table)
+        mode = stab.apply(mode)
+
+    Parameters
+    ----------
+    k:
+        Number of consecutive frames a new mode must be proposed before
+        the switch is committed (``k=1`` disables hysteresis).
+    """
+
+    def __init__(self, k: int = 5) -> None:
+        self.k         = k
+        self._current  = None
+        self._cand     = None
+        self._streak   = 0
+
+    def apply(self, proposed: str, force: bool = False) -> str:
+        """
+        Return the stabilised mode for the current frame.
+
+        Parameters
+        ----------
+        proposed:
+            Mode proposed by :func:`select_mode` for this frame.
+        force:
+            Commit the switch immediately, bypassing hysteresis.  Used for
+            safety-critical transitions (e.g. ``fallback_no_feasible_mode``),
+            where delaying the fallback would leave the vehicle on an
+            unreachable tier.
+        """
+        if force or self._current is None:
+            self._current = proposed
+            self._cand, self._streak = None, 0
+            return proposed
+        if proposed == self._current:
+            self._cand, self._streak = None, 0
+            return self._current
+        if proposed == self._cand:
+            self._streak += 1
+        else:
+            self._cand, self._streak = proposed, 1
+        if self._streak >= self.k:
+            self._current = self._cand
+            self._cand, self._streak = None, 0
+        return self._current
+
+    def reset(self) -> None:
+        """Clear all hysteresis state."""
+        self._current = None
+        self._cand    = None
+        self._streak  = 0
+
+
 def explain(table: dict[str, dict]) -> dict[str, dict]:
     """
     Return per-mode feasibility annotations for display purposes.
