@@ -68,14 +68,39 @@ python -m src.dataset.generate
 python -m src.predictor.model
 
 # 3 — run the end-to-end demo
-python demo.py --scenario urban_dense --hz 5 --frames 100
+python demo.py
 ```
 
-If dataset and model are already present:
+Steps 1 and 2 are optional: `demo.py` generates the dataset and trains the
+predictor on first run if they are missing.
 
 ```bash
-python demo.py --no-train --scenario highway --hz 10 --frames 200
+python demo.py --kiosk                       # unattended booth loop
+python demo.py --scenario highway --hz 10    # pick a road environment
+python demo.py --frames 0                    # run until 'q'
+python demo.py --quantile                    # gate on the q90 RTT upper bound
+python demo.py --outage-at 0                 # no scripted blackout
+python demo.py --no-train                    # fail instead of building artefacts
 ```
+
+### Live controls
+
+The demo is a full-screen dashboard; every key acts immediately, no Enter.
+
+| Key     | Action                                    |
+|---------|-------------------------------------------|
+| `1`–`5` | switch road scenario                      |
+| `o`     | inject MEC outage — forces C → D          |
+| `x`     | inject full blackout — forces C → B       |
+| `c`     | inject cloud congestion                   |
+| `space` | pause / resume                            |
+| `+` `-` | faster / slower                           |
+| `k`     | toggle kiosk auto-pilot                   |
+| `r`     | reset session counters                    |
+| `q`     | quit                                      |
+
+`--kiosk` runs forever, rotates through all five scenarios, and stages the
+three faults on a timer — the mode to leave running on a booth monitor.
 
 ---
 

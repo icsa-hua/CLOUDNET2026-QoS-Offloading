@@ -137,7 +137,7 @@ def _weighted_acc_loss(model_name: str) -> float:
 MODES: dict[str, dict] = {
     "A": {
         "model":        "yolov8n",
-        "hw":           "Car GPU 1",
+        "hw":           "Car NPU",
         "inference_ms": 8.0,
         "network_ms":   0.0,
         "total_ms":     8.0,
@@ -148,7 +148,7 @@ MODES: dict[str, dict] = {
     },
     "B": {
         "model":        "yolov8n",
-        "hw":           "Car GPU 2",
+        "hw":           "Car GPU",
         "inference_ms": 5.0,
         "network_ms":   0.0,
         "total_ms":     5.0,

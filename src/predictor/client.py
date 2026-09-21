@@ -77,6 +77,46 @@ class InferenceClient:
         self._dist      = float(self._profile["mec_spacing_m"] * 0.5)
         self._direction = -1.0
 
+    @property
+    def scenario(self) -> str:
+        """Road environment currently being simulated."""
+        return self._scenario
+
+    @property
+    def hz(self) -> int:
+        """Prediction rate in frames per second."""
+        return self._hz
+
+    @hz.setter
+    def hz(self, value: int) -> None:
+        self._hz = max(1, int(value))
+
+    @property
+    def profile(self) -> dict:
+        """Radio/traffic profile of the active scenario (``config.SCENARIOS``)."""
+        return self._profile
+
+    def set_scenario(self, scenario: str) -> None:
+        """
+        Switch road environment in place, keeping the loaded model bundle.
+
+        The model bundle is scenario-agnostic (``scenario`` is just a one-hot
+        input feature), so swapping environments needs no reload — which
+        matters for the live demo, where the serialised RandomForest bundle
+        is large enough that re-reading it would stall the display.
+
+        Parameters
+        ----------
+        scenario:
+            One of the keys in ``config.SCENARIOS``.
+        """
+        if scenario not in SCENARIOS:
+            raise ValueError(f"Unknown scenario '{scenario}'. Choose from: {list(SCENARIOS)}")
+        self._scenario  = scenario
+        self._profile   = SCENARIOS[scenario]
+        self._dist      = float(self._profile["mec_spacing_m"] * 0.5)
+        self._direction = -1.0
+
     def tick(self) -> dict:
         """
         Advance the simulation by one frame interval and return a prediction.

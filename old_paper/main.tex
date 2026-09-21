@@ -11,6 +11,7 @@
 \usepackage{cite}
 \usepackage{makecell}
 \usepackage[table]{xcolor}
+\usepackage{amssymb}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \title{QoS-Aware AI Inference Offloading for Vehicular Edge Computing:\\
@@ -57,23 +58,31 @@ distinct latency--accuracy trade-off (Table~\ref{tab:modes}).  Selecting the
 optimal tier in real time requires jointly predicting network conditions and
 enforcing Quality of Service (QoS) constraints simultaneously.
 
-Most vehicular offloading studies rely on proprietary radio traces or abstract
-the channel to the point that MEC latency variability is not faithfully
-reproduced.  This artifact provides an open, end-to-end reproducible
-baseline---from 3GPP-calibrated channel simulation to closed-loop
-optimisation---that is fully self-contained, runs offline, and is portable to
-any compute-intensive edge inference workload.  Use cases range from benchmarking novel offloading policies to evaluating
-new edge AI models and prototyping QoS-aware placement for autonomous
-driving or smart-infrastructure monitoring.
+Three properties of the vehicular setting make that decision hard.  The radio
+link is non-stationary: mobility, NLOS blockage, and cell-edge handovers
+change the achievable uplink rate on sub-second timescales, so a decision
+taken on stale state can miss the deadline.  The MEC server is contended, so
+its queueing delay depends on neighbouring vehicles the ego-vehicle cannot
+observe.  And the tiers differ in accuracy as well as in latency, so
+protecting the latency budget can silently degrade perception---a safety
+concern, not merely a performance one.
 
-\textbf{Delivery format:} physical, onsite demonstration at IEEE
-CloudNet~2026.  The complete system runs as a single terminal command on a
-standard laptop with no external hardware or network connection required.
+Most vehicular offloading studies rely on proprietary radio traces, or
+abstract the channel so far that MEC latency variability is not faithfully
+reproduced.  This artifact provides an open, reproducible baseline---from
+3GPP-calibrated channel simulation to closed-loop optimisation---that is
+self-contained, runs offline, and ports to any compute-intensive edge
+inference workload.
+
+\textbf{Delivery format:} onsite demonstration; the system runs as a single
+terminal command on a standard laptop, with no external hardware or network.
 
 % ── II. Innovation \& Contribution ───────────────────────────────────────────
 \section{Innovation \& Contribution}
 
+\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
 \begin{enumerate}
+  \setlength{\itemsep}{2pt}
   \item \textbf{Physics-based synthetic dataset (50\,k samples).}
         Generated via a 3GPP TR\,38.901-calibrated log-distance path-loss
         model~\cite{3gpp38901} with log-normal shadowing and non-line-of-sight
@@ -81,8 +90,17 @@ standard laptop with no external hardware or network connection required.
         throughput~\cite{shannon1948}.  Five road scenarios span 300\,m
         to 10\,km MEC inter-site distances (urban dense through rural),
         with scenario-specific speed, bandwidth, and frequency profiles.
-        Fixed-seed (42) reproducible; MIT license; schema in
-        Table~\ref{tab:schema}.
+        \emph{How the data is acquired:} no proprietary or measured trace is
+        used---every row is synthesised.  A scenario is drawn from a fixed
+        prior, then speed, MEC distance, co-served UEs (Poisson, rush-hour
+        scaled), server load (Beta), payload, and WAN congestion are sampled
+        from scenario-conditioned distributions and pushed through a
+        deterministic chain: path loss $\to$ RSSI (log-normal shadowing,
+        25--45\,dB NLOS penalty) $\to$ SINR $\to$ Shannon rate.  RTT labels
+        sum uplink, propagation, load-dependent queueing, and a 20\,ms
+        handover penalty; reachability is labelled by an SINR threshold.
+        Labels are generated, not annotated, and the table regenerates from
+        seed~42 in under a minute (MIT license; schema in Sec.~\ref{sec:artifact}).
 
   \item \textbf{Multi-output machine-learning (ML) predictor.}
         A \texttt{RandomForestRegressor} (200 trees, 80/20 train-test split)
@@ -90,74 +108,72 @@ standard laptop with no external hardware or network connection required.
         utilisation; a \texttt{GradientBoostingClassifier} predicts MEC
         availability (binary).  All scikit-learn~\cite{sklearn} pipelines are
         serialised to disk after training and loaded on subsequent runs,
-        reducing cold-start time to $\approx$1\,s.  Per-frame predictions are
-        smoothed with an exponential moving average ($\alpha$\,=\,0.3) to
-        suppress oscillation under transient channel variations.
+        reducing cold-start time to $\approx$1\,s.  Non-stationarity is
+        handled at decision time rather than by the regressor alone: an
+        exponential moving average ($\alpha$\,=\,0.3) damps jitter, while
+        spikes the model cannot anticipate---abrupt NLOS blockage, a
+        handover---are absorbed by the closed loop, which re-evaluates every
+        frame at 5--10\,Hz, so a mispredicted frame costs one frame interval
+        rather than a persistent mode error.  Reachability is a separate
+        classifier, so a hard outage is a discrete event and not an
+        extrapolated latency, and a shipped 90th-percentile model
+        (\texttt{predictor\_q90.pkl}) can replace the mean predictor for
+        conservative gating.  Tracking genuine drift would still need online
+        re-fitting; the training entry point is exposed for that.
 
   \item \textbf{Edge-first QoS optimizer.}
         The decision engine enforces three hard QoS budgets: total latency
         $\leq$100\,ms, accuracy loss $\leq$15\%, and server capacity
         $<$95\%.  Among feasible modes it applies an edge-first preference
-        rule: Mode~C (MEC) is chosen over Mode~D (Cloud) when the
-        incremental mean Average Precision (mAP) gain of the cloud model is
-        below 5\,pts, thereby conserving Wide Area Network (WAN) bandwidth.
+        rule: Mode~C (MEC) is chosen over Mode~D (Cloud) when the cloud
+        model's incremental mean Average Precision (mAP) gain is below
+        5\,pts, conserving Wide Area Network (WAN) bandwidth.
         If no mode satisfies all constraints---e.g.\ during a connectivity
         outage---the optimizer falls back to Mode~B (on-board GPU) with an
         explicit reason flag (\texttt{fallback\_no\_feasible\_mode}).
+        Mode~B is deliberately allowed to break the accuracy budget: the
+        budgets are ranked lexicographically, with latency and reachability
+        held as hard safety constraints and accuracy loss the one that yields
+        when nothing is feasible---through a prolonged outage, degraded
+        detection beats none.  The violation is never silent: the flag is
+        raised on every affected frame, the signal a production stack forwards
+        to the planner to reduce speed or extend headway until a compliant tier
+        returns.
 
   \item \textbf{Live four-tier failover demo.}
-        The complete pipeline executes in a single command and demonstrates
-        all four execution tiers within one 100-frame run.  A simulated
-        connectivity outage (frames 40--54) forces MEC unreachable and
-        inflates cloud RTT to 200\,ms, driving the system through a full
-        C\,$\to$\,B\,$\to$\,C failover and making all QoS constraint paths
-        observable in real time.
+        One command exercises all four tiers in a 100-frame run: an injected
+        outage (frames 40--54) drives a full C\,$\to$\,B\,$\to$\,C failover,
+        making every QoS constraint path observable in real time.
 \end{enumerate}
 
-% Tables II and I placed after Innovation so LaTeX floats both to page 2.
+% Merged spec + live snapshot table; floats to the top of a page-2 column.
 \begin{table}[t]
 \centering
-\caption{YOLOv8 Execution Mode Specifications}
+\caption{%
+  YOLOv8 execution modes: specification and live optimizer snapshot
+  (suburban, frame 100/100, MEC dist.\ 611\,m, signal $-$55.5\,dBm,
+  4 mode switches).  Tot.\,(ms)\,=\,inference\,$+$\,network RTT.%
+}
 \label{tab:modes}
-\scriptsize\setlength{\tabcolsep}{5pt}
-\begin{tabular}{@{}clrrr@{}}
+\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}clrrrl@{}}
 \toprule
-\textbf{Mode} & \textbf{Hardware\,/\,Model} &
-  \textbf{Tot.\,(ms)} & \textbf{mAP} & \textbf{AccLoss} \\
+\textbf{M.} & \textbf{Hardware\,/\,Model} &
+  \textbf{Tot.\,(ms)} & \textbf{mAP} & \textbf{AccLoss} &
+  \textbf{Status} \\
 \midrule
-A & Car NPU\,/\,YOLOv8n  &   8       & 37.3 & 20.8\%$^*$ \\
-B & Car GPU\,/\,YOLOv8n  &   5       & 37.3 & 20.8\%$^*$ \\
-C & MEC\,/\,YOLOv8m      & $\sim$24  & 50.2 &  4.9\%     \\
-D & Cloud\,/\,YOLOv8l    & $\sim$84  & 52.9 &  0.0\%     \\
+A & Car NPU\,/\,\texttt{yolov8n} &  8.0 & 37.3 & 20.8\% &
+  $\times$\ loss\,$>$\,15\% \\
+B & Car GPU\,/\,\texttt{yolov8n} &  5.0 & 37.3 & 20.8\% &
+  $\times$\ loss\,$>$\,15\% \\
+\rowcolor{gray!15}
+C & MEC\,/\,\texttt{yolov8m}     & 56.9 & 50.2 &  4.9\% &
+  $\blacktriangleleft$\ \textbf{SELECTED} \\
+D & Cloud\,/\,\texttt{yolov8l}   & 71.6 & 52.9 &  0.0\% &
+  feasible, not preferred \\
 \bottomrule
-\multicolumn{5}{@{}l}{Budget: latency $\leq$100\,ms, acc.\ loss $\leq$15\%, cap.\ $<$95\%.}\\
-\multicolumn{5}{@{}l}{$^*$Exceed budget; activate only as emergency fallback.}
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering
-\caption{Dataset Feature Schema (key columns; full schema in repository)}
-\label{tab:schema}
-\small\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Feature} & \textbf{Type} & \textbf{Description} \\
-\midrule
-\texttt{scenario}              & cat.  & Road environment (5 types) \\
-\texttt{car\_speed\_kmh}       & float & Vehicle speed (km/h) \\
-\texttt{mec\_distance\_m}      & float & Distance to MEC tower (m) \\
-\texttt{mec\_rssi\_dbm}        & float & Received signal strength (dBm) \\
-\texttt{num\_connected\_ues}   & int   & User equipment sharing cell \\
-\texttt{cloud\_congestion}     & float & WAN congestion index [0,\,1] \\
-\texttt{payload\_kb}           & float & Compressed frame size (kB) \\
-\midrule
-\texttt{mec\_available}        & bin.  & \textbf{Target:} MEC reachability \\
-\texttt{mec\_network\_ms}      & float & \textbf{Target:} MEC RTT (ms) \\
-\texttt{mec\_capacity\_pct}    & float & \textbf{Target:} MEC load (\%) \\
-\texttt{cloud\_network\_ms}    & float & \textbf{Target:} Cloud RTT (ms) \\
-\texttt{cloud\_capacity\_pct}  & float & \textbf{Target:} Cloud load (\%) \\
-\bottomrule
+\multicolumn{6}{@{}l}{Budget: latency $\leq$100\,ms, acc.\ loss $\leq$15\%, cap.\ $<$95\%.}\\
+\multicolumn{6}{@{}l}{Modes A/B exceed the accuracy budget; emergency fallback only.}
 \end{tabular}
 \end{table}
 
@@ -166,73 +182,63 @@ D & Cloud\,/\,YOLOv8l    & $\sim$84  & 52.9 &  0.0\%     \\
 
 The artifact targets CloudNet researchers working on vehicular edge
 computing~\cite{shi2016edge}, task offloading~\cite{chen2019offloading}, and
-5G edge AI~\cite{liu2020edge}.  Key takeaways:
-\begin{itemize}
-  \item \textbf{Reproducible baseline.}  A 3GPP-calibrated MEC offloading
-        dataset across five deployment archetypes, from dense urban (300\,m
-        MEC spacing) to rural (10\,km), freely available for comparison and
-        extension by the research community.
-  \item \textbf{Offloading as a necessity.}  Empirical evidence that on-board
-        YOLOv8n (Modes~A/B) incurs a 20.8\% accuracy loss relative to cloud
-        YOLOv8l, exceeding the 15\% QoS budget and making MEC/cloud
-        offloading mandatory whenever connectivity permits.
-  \item \textbf{End-to-end blueprint.}  A complete, runnable coupling of ML
-        network-state prediction with a policy-based QoS optimizer, portable
-        to other inference workloads (e.g.\ LiDAR processing, V2X perception)
-        and extendable to new tier definitions or QoS policies.
-\end{itemize}
+5G edge AI~\cite{liu2020edge}.  It contributes a \textbf{reproducible
+baseline}---a 3GPP-calibrated offloading dataset over five deployment
+archetypes, from dense urban (300\,m MEC spacing) to rural (10\,km)---and
+\textbf{evidence that offloading is necessary}: on-board YOLOv8n loses
+20.8\% accuracy against cloud YOLOv8l, breaching the 15\% budget whenever a
+remote tier is reachable.  It is also an \textbf{end-to-end blueprint}
+coupling ML network-state prediction to a policy-based QoS optimizer,
+portable to other workloads (LiDAR, V2X perception) and extendable with new
+tiers or policies.
 
 % ── IV. Demonstration Plan \& Requirements ────────────────────────────────────
 \section{Demonstration Plan \& Requirements}
 
 \textbf{Setup.}
-Install dependencies (\texttt{pip install -r requirements.txt}) and launch
-\texttt{python demo.py}.  On first run the system auto-generates the 50\,k
-synthetic dataset and trains all ML models ($\approx$50\,s total);
-subsequent runs load the serialised models and start in $\approx$2\,s.
+Run \texttt{pip install -r requirements.txt}, then \texttt{python demo.py}.
+The first run auto-generates the 50\,k dataset and trains all models
+($\approx$50\,s); later runs load the serialised models and start in
+$\approx$2\,s.
 
 \textbf{What the audience observes.}
-The terminal table (Table~\ref{tab:live}) refreshes at 5\,Hz for 100 frames,
-showing all four tiers simultaneously with live per-mode latency, accuracy
-loss, capacity, and decision reason.  Under normal suburban conditions Mode~C
-(MEC / YOLOv8m, $\approx$57\,ms total) is selected over Mode~D (Cloud /
-YOLOv8l, $\approx$72\,ms) by the edge-first rule.  Modes~A and~B are visible
-every frame, marked infeasible due to the 20.8\% accuracy-loss violation.
-Starting at frame~40 an injected outage forces MEC unavailable and cloud RTT
-to 200\,ms; the optimizer switches to Mode~B (5\,ms on-board GPU) with reason
-\texttt{fallback\_no\_feasible\_mode}, demonstrating the full failover path
-before recovering to Mode~C once the outage clears.
+The terminal view (Table~\ref{tab:modes}) refreshes at 5\,Hz for 100 frames,
+showing all four tiers at once with live per-mode latency, accuracy loss,
+capacity, and decision reason.  In normal suburban conditions Mode~C is
+selected over Mode~D by the edge-first rule, with Modes~A and~B visible and
+marked infeasible.  At frame~40 the injected outage forces MEC unavailable and
+cloud RTT to 200\,ms; the optimizer drops to Mode~B with reason
+\texttt{fallback\_no\_feasible\_mode}, then recovers.
 
-\textbf{AV / Power:} standard laptop (CPU-only, no GPU required); terminal
-with ANSI colour support.  No special power supply, networking, or AV
-equipment needed.  Total runtime: $\approx$50\,s first run, $\approx$20\,s
-subsequently.
+\textbf{AV / Power:} standard laptop (CPU-only), terminal with ANSI colour;
+no special power, networking, or AV equipment needed.
 
 % ── V. Artifact Details ───────────────────────────────────────────────────────
 \section{Artifact Details}
+\label{sec:artifact}
 
 All components are in a public GitHub repository
-(\url{https://github.com/icsa-hua/CLOUDNET2026-QoS-Offloading/tree/main}, release
-\texttt{v1.0.0}; Ubuntu~22.04 / macOS~14 / Python~3.11).
-
-\textbf{Dataset:} 50\,k-row CSV, 13 features\,+\,5 targets
-(Table~\ref{tab:schema}); synthetic,
-\texttt{python -m src.dataset.generate -{}-seed 42}.
-
-\textbf{Framework:} \texttt{src/dataset/} (channel sim),
-\texttt{src/predictor/} (ML pipelines), \texttt{src/offloading/}
-(QoS optimizer).  Dataset and model bundled; auto-recreated if absent.
-
-\textbf{Demo:} \texttt{python demo.py} shows live per-mode latency,
-accuracy loss, capacity, and decision reason; configurable via
-\texttt{-{}-scenario}, \texttt{-{}-hz}, \texttt{-{}-outage-at}.
+(\url{https://github.com/icsa-hua/CLOUDNET2026-QoS-Offloading}, release
+\texttt{v1.0.0}; Ubuntu~22.04 / macOS~14 / Python~3.11).  The
+\textbf{dataset} is a 50\,k-row CSV regenerated by
+\texttt{python -m src.dataset.generate -{}-seed 42}.  Its 13 observable
+features cover the scenario label, vehicle speed, time of day, MEC distance,
+RSSI, channel bandwidth, MEC load, co-served UEs, handover flag, payload size,
+WAN congestion, cloud base RTT, and cloud load; the 5 targets are MEC
+reachability (binary), MEC and cloud RTT (ms), and MEC and cloud capacity
+(\%).  The
+\textbf{framework} splits into \texttt{src/dataset/} (channel sim),
+\texttt{src/predictor/} (ML pipelines), and \texttt{src/offloading/} (QoS
+optimizer); dataset and models are bundled and auto-recreated if absent.  The
+\textbf{demo} (\texttt{python demo.py}) is configurable via
+\texttt{-{}-scenario}, \texttt{-{}-hz}, and \texttt{-{}-outage-at}.
 
 % ── VI. Ethics, Privacy \& Safety ────────────────────────────────────────────
 \section{Ethics, Privacy \& Safety}
 
 The dataset is entirely synthetic---generated from a calibrated radio-physics
 model with no real-world measurements, user data, or personally identifiable
-information.  No human subjects or consent procedures are required.  The
+information.  No human subjects or consent procedures are involved; the
 framework poses no safety risk.
 
 % ── Acknowledgment ───────────────────────────────────────────────────────────
@@ -244,56 +250,38 @@ including top-up funding by the national authorities of Austria, Denmark,
 Germany, Greece, Finland, Italy, Netherlands, Poland, Portugal, Spain, and
 Turkey.
 
-% Table III: single-column, placed before bibliography so LaTeX
-% numbers it correctly and floats it to the bottom of a page-2 column.
-\begin{table}[b]
-\centering
-\caption{%
-  Live optimizer snapshot (suburban, frame 100/100, MEC dist.\ 611\,m,
-  signal $-$55.5\,dBm, 4 mode switches).
-  Tot.\,(ms)\,=\,inference\,$+$\,network RTT.%
-}
-\label{tab:live}
-\renewcommand{\arraystretch}{0.95}
-\setlength{\tabcolsep}{3pt}
-\scriptsize
-\begin{tabular}{@{} c l r r r l @{}}
-\Xhline{2\arrayrulewidth}
-\textbf{M.} & \textbf{Model} &
-  \textbf{Tot.\,(ms)} & \textbf{mAP} & \textbf{AccLoss} &
-  \textbf{Status} \\
-\hline
-A & \texttt{yolov8n} &  8.0 & 37.3 & 20.8\% & $\times$\ loss\,$>$\,15\% \\
-B & \texttt{yolov8n} &  5.0 & 37.3 & 20.8\% & $\times$\ loss\,$>$\,15\% \\
-\rowcolor{gray!15}
-C & \texttt{yolov8m} & 56.9 & 50.2 &  4.9\% &
-  $\blacktriangleleft$\ \textbf{SELECTED} \\
-D & \texttt{yolov8l} & 71.6 & 52.9 &  0.0\% & feasible, not preferred \\
-\Xhline{2\arrayrulewidth}
-\end{tabular}
-\end{table}
-
 \begin{thebibliography}{8}
+\setlength{\itemsep}{0pt plus 0.3pt}
 
 \bibitem{yolov8}
 G.~Jocher, A.~Chaurasia, and J.~Qiu,
-``Ultralytics YOLOv8,'' GitHub, 2023.
-[Online]. Available: \url{https://github.com/ultralytics/ultralytics}
+``Ultralytics YOLOv8,'' 2023.
+\url{https://github.com/ultralytics/ultralytics}
 
 \bibitem{etsi_mec}
 ETSI,
-``GS MEC~003: MEC Framework and Reference Architecture, v3.1.1,'' 2022.
+``GS MEC~003: MEC framework and reference architecture, v3.1.1,'' 2022.
 
 \bibitem{3gpp38901}
 3GPP,
-``TR~38.901: Study on channel model for frequencies from 0.5 to
-100~GHz, v16.1.0,'' 3rd Generation Partnership Project, 2019.
+``TR~38.901: Channel model for frequencies from 0.5 to 100~GHz,
+v16.1.0,'' 2019.
 
 \bibitem{shannon1948}
 C.~E.~Shannon,
 ``A mathematical theory of communication,''
 \textit{Bell Syst. Tech. J.}, vol.~27, pp.~379--423, 1948.
 
+
+\bibitem{sklearn}
+F.~Pedregosa \textit{et~al.},
+``Scikit-learn: Machine learning in Python,''
+\textit{J. Mach. Learn. Res.}, vol.~12, pp.~2825--2830, 2011.
+
+\bibitem{shi2016edge}
+W.~Shi, J.~Cao, Q.~Zhang, Y.~Li, and L.~Xu,
+``Edge computing: Vision and challenges,''
+\textit{IEEE Internet Things J.}, vol.~3, no.~5, pp.~637--646, 2016.
 
 \bibitem{chen2019offloading}
 X.~Chen \textit{et~al.},
