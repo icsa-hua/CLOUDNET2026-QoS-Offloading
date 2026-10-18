@@ -3,7 +3,7 @@
 **IEEE CloudNet 2026 · Demo & Artifact Submission**  
 Dept. of Informatics and Telematics, Harokopio University of Athens (HUA)
 
-**Conference presentation:** [7-slide PDF](presentation/CLOUDNET2026_Demo_Gyftodimos.pdf)
+**Conference presentation:** [8-slide PDF](presentation/CLOUDNET2026_Demo_Gyftodimos.pdf)
 · [Greek presenter notes](presentation/PRESENTER_NOTES_EL.md)
 · [Demo walkthrough and preparation](presentation/README.md)
 

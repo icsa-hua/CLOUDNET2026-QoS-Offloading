@@ -1,6 +1,6 @@
 # IEEE CloudNet 2026 demo presentation
 
-Open **CLOUDNET2026_Demo_Gyftodimos.pdf**. It contains five substantive presentation slides, followed by two annotated dashboard reference slides. There are no introduction or closing slides. Presenter: Konstantinos Gyftodimos, PhD candidate, Harokopio University of Athens (HUA).
+Open **CLOUDNET2026_Demo_Gyftodimos.pdf**. It contains a new illustrated perception-flow slide, the five existing presentation slides, and two annotated dashboard reference slides (eight pages total). There are no title-only or closing slides. Presenter: Konstantinos Gyftodimos, PhD candidate, Harokopio University of Athens (HUA).
 
 ## Before presenting
 
@@ -48,4 +48,4 @@ python presentation/capture_demo.py
 python presentation/build_presentation.py
 ```
 
-`overview.png` previews all seven pages; `slide-01.png` through `slide-07.png` are individual slide previews. Logo downloads are included so rebuilding does not need network access.
+`overview.png` previews all eight pages; `slide-01.png` through `slide-08.png` are individual slide previews. Logo downloads and the generated rural illustration are included so rebuilding does not need network access. The illustration was generated using the built-in image generation tool; its exact prompt is saved in `assets/rural-perception-flow-prompt.txt`.

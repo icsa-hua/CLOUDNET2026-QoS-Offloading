@@ -1,4 +1,4 @@
-"""Build the seven-slide IEEE CloudNet demo PDF and preview images.
+"""Build the eight-slide IEEE CloudNet demo PDF and preview images.
 
 Run with Python containing reportlab, Pillow and pymupdf.
 Dashboard PNGs are captured separately with capture_demo.py.
@@ -73,7 +73,7 @@ def base(n,title,sub):
     text(58,127,title,40,NAVY,True); text(60,183,sub,22,MUTED)
     rect(58,831,1484,1,'#D3DEE8')
     text(60,848,'Konstantinos Gyftodimos  |  PhD candidate  |  Harokopio University of Athens (HUA)',18,MUTED)
-    text(1240,848,f'IEEE CloudNet 2026   /   {n:02d}',18,BLUE,True)
+    text(1240,848,f'IEEE CloudNet 2026   /   {n+1:02d}',18,BLUE,True)
 
 def card(x,y,w,h,title,body,color=BLUE):
     rect(x,y,w,h,'#FFFFFF',14); rect(x,y,6,h,color,3)
@@ -81,6 +81,19 @@ def card(x,y,w,h,title,body,color=BLUE):
     para(x+26,y+76,body,w-52,24)
 
 def end(): c.showPage()
+
+# New visual opening; all seven existing slides follow unchanged.
+base(0,'One perception frame. Three places to run the AI.',
+     'Camera frame → vehicle state + network prediction → QoS-aware choice → detection result back to the vehicle')
+img(A/'rural-perception-flow.png',60,229,1480,450)
+for x,title,body,col in [
+    (60,'ON-BOARD GPU','Local execution when remote tiers cannot meet the limits.',BLUE),
+    (562,'MEC SERVER','Prefer the nearby edge when its accuracy is sufficient.',TEAL),
+    (1064,'CLOUD','Use remote capacity when feasible and appropriate.','#7956A6')]:
+    rect(x,697,476,108,'#FFFFFF',12)
+    text(x+20,713,title,23,col,True)
+    para(x+20,751,body,435,20)
+end()
 
 # 1: substantive opening, no title-only introduction.
 base(1,'Where should a vehicle run its perception AI?',
@@ -197,11 +210,11 @@ end()
 c.save()
 
 doc=fitz.open(PDF)
-assert len(doc)==7
+assert len(doc)==8
 for i,page in enumerate(doc):
     page.get_pixmap(matrix=fitz.Matrix(.8,.8)).save(HERE/f'slide-{i+1:02d}.png')
 thumbs=[]
-for i in range(7):
+for i in range(8):
     im=Image.open(HERE/f'slide-{i+1:02d}.png'); im.thumbnail((640,360)); thumbs.append(im)
 contact=Image.new('RGB',(1280,4*360),'#D3DEE8')
 for i,im in enumerate(thumbs): contact.paste(im,((i%2)*640,(i//2)*360))
