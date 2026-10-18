@@ -25,7 +25,8 @@ Live controls (any key, no Enter needed)::
 
 Usage::
 
-    python demo.py                              # paper run: 100 frames, outage at 40
+    python demo.py                              # run until 'q', outage at frame 40
+    python demo.py --frames 100                 # finite paper run
     python demo.py --kiosk                      # unattended booth loop (recommended)
     python demo.py --scenario highway --hz 10
     python demo.py --frames 0                   # run until 'q'
@@ -591,7 +592,7 @@ class Demo:
         self,
         scenario:     str   = "suburban",
         hz:           int   = 5,
-        frames:       int   = 100,
+        frames:       int   = 0,
         outage_at:    int   = 40,
         outage_dur:   int   = 15,
         dwell:        int   = 1,
@@ -877,7 +878,7 @@ def main() -> None:
     ap.add_argument("--scenario", default="suburban", choices=SCENARIO_ORDER,
                     help="Road environment to start in")
     ap.add_argument("--hz", type=int, default=5, help="Frames per second")
-    ap.add_argument("--frames", type=int, default=100,
+    ap.add_argument("--frames", type=int, default=0,
                     help="Frames to simulate (0 = run until 'q')")
     ap.add_argument("--outage-at", type=int, default=40,
                     help="Frame that triggers the scripted blackout (0 = none)")

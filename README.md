@@ -3,6 +3,10 @@
 **IEEE CloudNet 2026 · Demo & Artifact Submission**  
 Dept. of Informatics and Telematics, Harokopio University of Athens (HUA)
 
+**Conference presentation:** [7-slide PDF](presentation/CLOUDNET2026_Demo_Gyftodimos.pdf)
+· [Greek presenter notes](presentation/PRESENTER_NOTES_EL.md)
+· [Demo walkthrough and preparation](presentation/README.md)
+
 ---
 
 ## Overview
@@ -74,10 +78,14 @@ python demo.py
 Steps 1 and 2 are optional: `demo.py` generates the dataset and trains the
 predictor on first run if they are missing.
 
+By default, `python demo.py` keeps running until you press `q` (no Enter needed).
+The scripted blackout still starts at frame 40; use `--outage-at 0` for manual faults only.
+
 ```bash
 python demo.py --kiosk                       # unattended booth loop
 python demo.py --scenario highway --hz 10    # pick a road environment
 python demo.py --frames 0                    # run until 'q'
+python demo.py --frames 100                  # optional finite run
 python demo.py --quantile                    # gate on the q90 RTT upper bound
 python demo.py --outage-at 0                 # no scripted blackout
 python demo.py --no-train                    # fail instead of building artefacts

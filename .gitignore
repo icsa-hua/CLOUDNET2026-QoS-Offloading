@@ -12,6 +12,9 @@ output/
 *.pkl
 __pycache__/
 *.pyc
+.venv/
+# Local duplicate checkout (the parent repository is the source of truth)
+/CLOUDNET2026-QoS-Offloading/
 
 # YOLO weights
 *.pt
